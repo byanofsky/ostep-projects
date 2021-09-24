@@ -39,6 +39,8 @@ int main(int argc, char* argv[]) {
   size_t len = 0;
   ssize_t nread;
   char** partsbuffer = NULL;
+  // Null terminated list of paths.
+  char** path = NULL;
 
   while (1) {
     printf("wish> ");
@@ -56,14 +58,28 @@ int main(int argc, char* argv[]) {
       exit(1);
     }
 
-    parseline(line, &partsbuffer);
+    int nparts = parseline(line, &partsbuffer);
 
-    // If command 'exit', then exit.
+    // Builtins
     if (strcmp(partsbuffer[0], "exit") == 0) {
-      break;
+      exit(0);
+    } else if (strcmp(partsbuffer[0], "cd") == 0) {
+      chdir(partsbuffer[1]);
+    } else if (strcmp(partsbuffer[0], "path") == 0) {
+      int pathinputs = nparts - 1;  // Don't count command.
+      path = realloc(path, pathinputs * sizeof(char*)); 
+      if (path == NULL) {
+        perror("path - realloc");
+        exit(1);
+      }
+      for (int i = 1; i < nparts; i++) {
+        // TODO: Should this be a string copy?
+        path[i-1] = partsbuffer[i];
+      }
     }
-  }
 
+  }
+  // Included for good form, but likely not required.
   free(line);
   free(partsbuffer);
   exit(0);

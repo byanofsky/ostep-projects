@@ -33,6 +33,33 @@ int parseline(char* line, char*** buffer) {
   return count;
 }
 
+void executecmd(int argc, char* argv[], 
+    char* path[], int path_size) {
+    char* cmd = argv[0];
+  for (int i = 0; i < path_size; i++) {
+    // Add 2 for string terminator and slash before cmd.
+    char* cmdpath = malloc(strlen(cmd) + strlen(path[i]) + 2);
+    if (cmdpath == NULL) {
+      perror("executecmd");
+      exit(1);
+    }
+    strcpy(cmdpath, path[i]);
+    strcat(cmdpath, "/");
+    strcat(cmdpath, cmd);
+    if (access(cmdpath, X_OK) == 0) {
+      printf("Success: %s\n", cmdpath);
+      return;
+    } else if (errno == ENOTDIR || errno == ENOENT) {
+      // Could not find in path.
+    } else {
+      // actual error, so exit.
+      perror("access");
+      exit(1);
+    }
+  }
+  // TODO: Handle if unable to find command.
+}
+
 int main(int argc, char* argv[]) {
   // TODO: Handle batch
   char* line = NULL;
@@ -41,6 +68,7 @@ int main(int argc, char* argv[]) {
   char** partsbuffer = NULL;
   // Null terminated list of paths.
   char** path = NULL;
+  int path_size = 0;
 
   while (1) {
     printf("wish> ");
@@ -66,8 +94,8 @@ int main(int argc, char* argv[]) {
     } else if (strcmp(partsbuffer[0], "cd") == 0) {
       chdir(partsbuffer[1]);
     } else if (strcmp(partsbuffer[0], "path") == 0) {
-      int pathinputs = nparts - 1;  // Don't count command.
-      path = realloc(path, pathinputs * sizeof(char*)); 
+      path_size = nparts - 1;  // Don't count command.
+      path = realloc(path, path_size * sizeof(char*)); 
       if (path == NULL) {
         perror("path - realloc");
         exit(1);
@@ -76,6 +104,8 @@ int main(int argc, char* argv[]) {
         // TODO: Should this be a string copy?
         path[i-1] = partsbuffer[i];
       }
+    } else {
+      executecmd(nparts, partsbuffer, path, path_size);
     }
 
   }

@@ -4,6 +4,10 @@
 #include <string.h>
 #include <errno.h>
 
+// Null terminated list of paths.
+char** path = NULL;
+int path_size = 0;
+
 // Given a line, parses the whitespace separated
 // parts and stores in buffer. The return value
 // specifies how many parts are parsed.
@@ -82,17 +86,51 @@ void executecmd(int argc, char* argv[],
   printf("Could not find command: %s\n", cmd);
 }
 
+void executeline(char* line) {
+  char** partsbuffer = NULL;
+  int nparts = parseline(line, &partsbuffer);
+
+  // Builtins
+  if (strcmp(partsbuffer[0], "exit") == 0) {
+    exit(0);
+  } else if (strcmp(partsbuffer[0], "cd") == 0) {
+    chdir(partsbuffer[1]);
+  } else if (strcmp(partsbuffer[0], "path") == 0) {
+    path_size = nparts - 1;  // Don't count command.
+    path = realloc(path, path_size * sizeof(char*)); 
+    if (path == NULL) {
+      perror("path - realloc");
+      exit(1);
+    }
+    for (int i = 1; i < nparts; i++) {
+      char* pathcpy = (char*) malloc(strlen(partsbuffer[i])+1);
+      if (pathcpy == NULL) {
+        perror("pathcpy malloc");
+        exit(1);
+      }
+      strcpy(pathcpy, partsbuffer[i]);
+      path[i-1] = pathcpy;
+    }
+  } else {
+    // Add NULL terminator
+    partsbuffer = realloc(partsbuffer, (nparts+1) * sizeof(char*));
+    if (partsbuffer == NULL) {
+      perror("partsbuffer realloc");
+      exit(1);
+    }
+    partsbuffer[nparts] = NULL;
+    executecmd(nparts, partsbuffer, path, path_size);
+  }
+}
+
 int main(int argc, char* argv[]) {
   // TODO: Handle batch
   char* line = NULL;
   size_t len = 0;
   ssize_t nread;
   char** partsbuffer = NULL;
-  // Null terminated list of paths.
-  char** path = NULL;
-  int path_size = 0;
-
-  // Initialize path with `/bin`
+  //
+   // Initialize path with `/bin`
   path = malloc(sizeof(char*));
   if (path == NULL) {
     perror("initialize path - malloc");
@@ -101,59 +139,43 @@ int main(int argc, char* argv[]) {
   path[0] = "/bin";
   path_size++;
 
-  while (1) {
-    printf("wish> ");
-    nread = getline(&line, &len, stdin);
-
-
-    if (nread < 0) {
-      // TODO: errno is 0 when getline receives EOF.
-      // Instead, can this be intercepted?
-      if (errno == 0) {
-        // Print line break for cleaner UI.
-        printf("\n");
-        break;
+  if (argc == 1) {
+    // interactive mode
+    while (1) {
+      printf("wish> ");
+      nread = getline(&line, &len, stdin);
+      if (nread < 0) {
+        // TODO: errno is 0 when getline receives EOF.
+        // Instead, can this be intercepted?
+        if (errno == 0) {
+          // Print line break for cleaner UI.
+          printf("\n");
+          break;
+        }
+        perror("getline");
+        exit(1);
       }
-      perror("getline");
+      executeline(line);
+    }
+  } else if (argc == 2) {
+    // batch mode
+    FILE *file;
+    file = fopen(argv[1], "r");
+    if (file == NULL) {
+      perror("batch - fopen");
       exit(1);
     }
-
-    int nparts = parseline(line, &partsbuffer);
-
-    // Builtins
-    if (strcmp(partsbuffer[0], "exit") == 0) {
-      exit(0);
-    } else if (strcmp(partsbuffer[0], "cd") == 0) {
-      chdir(partsbuffer[1]);
-    } else if (strcmp(partsbuffer[0], "path") == 0) {
-      path_size = nparts - 1;  // Don't count command.
-      path = realloc(path, path_size * sizeof(char*)); 
-      if (path == NULL) {
-        perror("path - realloc");
-        exit(1);
-      }
-      for (int i = 1; i < nparts; i++) {
-        char* pathcpy = (char*) malloc(strlen(partsbuffer[i])+1);
-        if (pathcpy == NULL) {
-          perror("pathcpy malloc");
-          exit(1);
-        }
-        strcpy(pathcpy, partsbuffer[i]);
-        path[i-1] = pathcpy;
-      }
-    } else {
-      // Add NULL terminator
-      partsbuffer = realloc(partsbuffer, (nparts+1) * sizeof(char*));
-      if (partsbuffer == NULL) {
-        perror("partsbuffer realloc");
-        exit(1);
-      }
-      partsbuffer[nparts] = NULL;
-      executecmd(nparts, partsbuffer, path, path_size);
+    while (getline(&line, &len, file) > 0) {
+      executeline(line);
     }
-
+  } else {
+    // error, incorrect usage
+    printf("Usage: wish <file?>\n");
+    exit(1);
   }
+
   // Included for good form, but likely not required.
+  // TODO: Should line be freed between each use?
   free(line);
   free(partsbuffer);
   exit(0);

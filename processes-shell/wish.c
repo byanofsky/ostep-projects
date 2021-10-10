@@ -47,7 +47,27 @@ void executecmd(int argc, char* argv[],
     strcat(cmdpath, "/");
     strcat(cmdpath, cmd);
     if (access(cmdpath, X_OK) == 0) {
-      printf("Success: %s\n", cmdpath);
+      pid_t pid = fork();
+      if (pid == 0) {
+        // child process
+        // Only returns on error.
+        int r = execv(cmdpath, argv);
+        if (r == -1) {
+          perror("execv");
+          exit(1);
+        }
+      } else if (pid == -1) {
+        // error
+        perror("fork");
+        exit(1);
+      } else {
+        // parent
+        pid_t w = wait(NULL);
+        if (w == -1) {
+          perror("wait");
+          exit(1);
+        }
+      }
       return;
     } else if (errno == ENOTDIR || errno == ENOENT) {
       // Could not find in path.
@@ -58,6 +78,8 @@ void executecmd(int argc, char* argv[],
     }
   }
   // TODO: Handle if unable to find command.
+  // TOOD: Should this print to stderr?
+  printf("Could not find command: %s\n", cmd);
 }
 
 int main(int argc, char* argv[]) {
@@ -73,6 +95,7 @@ int main(int argc, char* argv[]) {
   while (1) {
     printf("wish> ");
     nread = getline(&line, &len, stdin);
+
 
     if (nread < 0) {
       // TODO: errno is 0 when getline receives EOF.
@@ -101,10 +124,22 @@ int main(int argc, char* argv[]) {
         exit(1);
       }
       for (int i = 1; i < nparts; i++) {
-        // TODO: Should this be a string copy?
-        path[i-1] = partsbuffer[i];
+        char* pathcpy = (char*) malloc(strlen(partsbuffer[i])+1);
+        if (pathcpy == NULL) {
+          perror("pathcpy malloc");
+          exit(1);
+        }
+        strcpy(pathcpy, partsbuffer[i]);
+        path[i-1] = pathcpy;
       }
     } else {
+      // Add NULL terminator
+      partsbuffer = realloc(partsbuffer, (nparts+1) * sizeof(char*));
+      if (partsbuffer == NULL) {
+        perror("partsbuffer realloc");
+        exit(1);
+      }
+      partsbuffer[nparts] = NULL;
       executecmd(nparts, partsbuffer, path, path_size);
     }
 

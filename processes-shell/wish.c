@@ -92,6 +92,15 @@ int main(int argc, char* argv[]) {
   char** path = NULL;
   int path_size = 0;
 
+  // Initialize path with `/bin`
+  path = malloc(sizeof(char*));
+  if (path == NULL) {
+    perror("initialize path - malloc");
+    exit(1);
+  }
+  path[0] = "/bin";
+  path_size++;
+
   while (1) {
     printf("wish> ");
     nread = getline(&line, &len, stdin);

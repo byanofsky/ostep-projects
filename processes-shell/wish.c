@@ -83,7 +83,8 @@ void executecmd(int argc, char* argv[],
   }
   // TODO: Handle if unable to find command.
   // TOOD: Should this print to stderr?
-  printf("Could not find command: %s\n", cmd);
+  // printf("Could not find command: %s\n", cmd);
+  fprintf(stderr, "An error has occurred\n");
 }
 
 void executeline(char* line) {
@@ -92,8 +93,14 @@ void executeline(char* line) {
 
   // Builtins
   if (strcmp(partsbuffer[0], "exit") == 0) {
+    if (nparts != 1) {
+      fprintf(stderr, "An error has occurred\n");
+    }
     exit(0);
   } else if (strcmp(partsbuffer[0], "cd") == 0) {
+    if (nparts != 2) {
+      fprintf(stderr, "An error has occurred\n");
+    }
     chdir(partsbuffer[1]);
   } else if (strcmp(partsbuffer[0], "path") == 0) {
     path_size = nparts - 1;  // Don't count command.
@@ -170,7 +177,7 @@ int main(int argc, char* argv[]) {
     }
   } else {
     // error, incorrect usage
-    printf("Usage: wish <file?>\n");
+    fprintf(stderr, "Usage: wish <file?>\n");
     exit(1);
   }
 
